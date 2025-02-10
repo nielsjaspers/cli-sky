@@ -7,14 +7,21 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
-	// "github.com/bluesky-social/indigo/api/atproto"
-	// "github.com/bluesky-social/indigo/xrpc"
 	"github.com/joho/godotenv"
 )
+
+type PostRecord struct {
+	Text      string  `json:"text"`
+	CreatedAt string  `json:"createdAt"`
+	Facets    []Facet `json:"facets,omitempty"`
+}
 
 func CreateSession(dotenvPath string) (*http.Response, *BlueskyAuthResponse, string) {
 	if dotenvPath == "" {
@@ -97,27 +104,30 @@ func Post(content string, authResponse *BlueskyAuthResponse) {
 
 	createRecordURL := "https://bsky.social/xrpc/com.atproto.repo.createRecord"
 
-    session := map[string]string {
-        "accessJwt": authResponse.AccessJwt,
-        "did": authResponse.Did,
-    }
+	session := map[string]string{
+		"accessJwt": authResponse.AccessJwt,
+		"did":       authResponse.Did,
+	}
 
-    post := map[string]interface{}{
-        "text": content,
-        "createdAt": now,
-    }
+	facets := parseFacets(content)
 
-    requestBody, err := json.Marshal(map[string]interface{}{
+	postRecord := PostRecord{
+		Text:      content,
+		CreatedAt: now,
+		Facets:    facets,
+	}
+
+	requestBody, err := json.Marshal(map[string]interface{}{
 		"repo":       session["did"],
 		"collection": "app.bsky.feed.post",
-		"record":     post,
+		"record":     postRecord,
 	})
 	if err != nil {
 		fmt.Println("Error marshaling JSON:", err)
 		return
 	}
 
-    req, err := http.NewRequest("POST", createRecordURL, bytes.NewBuffer(requestBody))
+	req, err := http.NewRequest("POST", createRecordURL, bytes.NewBuffer(requestBody))
 	if err != nil {
 		fmt.Println("Error creating request:", err)
 		return
@@ -145,3 +155,143 @@ func Post(content string, authResponse *BlueskyAuthResponse) {
 	responseBody := buf.String()
 	fmt.Println("Response Body:", responseBody)
 }
+
+func parseFacets(text string) []Facet {
+	var facets []Facet
+	mentions := parseMentions(text)
+	urls := parseURLs(text)
+
+	for _, m := range mentions {
+		did, err := resolveHandle(m["handle"])
+		if err != nil {
+			fmt.Printf("Error resolving handle %s: %v\n", m["handle"], err)
+			continue // Skip this mention if handle resolution fails
+		}
+
+		start, err := strconv.Atoi(m["start"])
+		if err != nil {
+			fmt.Printf("Error converting start index to integer: %v\n", err)
+			continue // Skip this mention if start index conversion fails
+		}
+
+		end, err := strconv.Atoi(m["end"])
+		if err != nil {
+			fmt.Printf("Error converting end index to integer: %v\n", err)
+			continue // Skip this mention if end index conversion fails
+		}
+
+		facets = append(facets, Facet{
+			Index: FacetIndex{
+				ByteStart: start,
+				ByteEnd:   end,
+			},
+			Features: []FacetFeature{{
+				Type: "app.bsky.richtext.facet#mention",
+				Did:  did,
+			}},
+		})
+	}
+
+	for _, u := range urls {
+		start, err := strconv.Atoi(u["start"])
+		if err != nil {
+			fmt.Printf("Error converting start index to integer: %v\n", err)
+			continue // Skip this URL if start index conversion fails
+		}
+
+		end, err := strconv.Atoi(u["end"])
+		if err != nil {
+			fmt.Printf("Error converting end index to integer: %v\n", err)
+			continue // Skip this URL if end index conversion fails
+		}
+		facets = append(facets, Facet{
+			Index: FacetIndex{
+				ByteStart: start,
+				ByteEnd:   end,
+			},
+			Features: []FacetFeature{{
+				Type: "app.bsky.richtext.facet#link",
+				URI:  u["url"],
+			}},
+		})
+	}
+
+	return facets
+}
+
+// Modified parseMentions to return the handle and indices
+func parseMentions(text string) []map[string]string {
+	var spans []map[string]string
+	mentionRegex := regexp.MustCompile(`[$|\W](@([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)`)
+	textBytes := []byte(text)
+
+	for _, match := range mentionRegex.FindAllSubmatchIndex(textBytes, -1) {
+		if len(match) >= 6 { // Ensure we have enough submatches
+			start := match[2] + 1 // Adjust for the leading character
+			end := match[3]
+			handle := string(textBytes[match[4]:match[5]]) // Extract the handle
+
+			spans = append(spans, map[string]string{
+				"start":  fmt.Sprintf("%d", start), 
+				"end":    fmt.Sprintf("%d", end),   
+				"handle": string(handle),
+			})
+		}
+	}
+	return spans
+}
+
+// Modified parseURLs to return the URL and indices
+func parseURLs(text string) []map[string]string {
+	var spans []map[string]string
+	urlRegex := regexp.MustCompile(`[$|\W](https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*[-a-zA-Z0-9@%_\+~#//=])?)`)
+	textBytes := []byte(text)
+
+	for _, match := range urlRegex.FindAllSubmatchIndex(textBytes, -1) {
+		if len(match) >= 4 {
+			start := match[2] + 1 
+			end := match[3]
+			urlStr := string(textBytes[match[2]:match[3]]) // Extract the URL
+
+			spans = append(spans, map[string]string{
+				"start": fmt.Sprintf("%d", start),
+				"end":   fmt.Sprintf("%d", end),
+				"url":   urlStr,
+			})
+		}
+	}
+	return spans
+}
+
+func resolveHandle(handle string) (string, error) {
+	resolveURL := "https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=" + url.QueryEscape(handle)
+
+	resp, err := http.Get(resolveURL)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("handle resolution failed with status: %s", resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var resolveResponse map[string]interface{}
+	err = json.Unmarshal(body, &resolveResponse)
+	if err != nil {
+		return "", err
+	}
+
+	did, ok := resolveResponse["did"].(string)
+	if !ok {
+		return "", fmt.Errorf("DID not found in response")
+	}
+
+	return did, nil
+}
+

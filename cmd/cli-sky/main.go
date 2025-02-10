@@ -12,5 +12,5 @@ func main(){
     _, authResponse, responseBody := bluesky.CreateSession("")
     fmt.Println(responseBody)
 
-    bluesky.Post("Just testing something out. Don't mind me :)", authResponse)
+    bluesky.Post("hashtag test #helloworld", authResponse)
 }
