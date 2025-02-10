@@ -20,7 +20,7 @@ import (
 type PostRecord struct {
 	Text      string  `json:"text"`
 	CreatedAt string  `json:"createdAt"`
-	Facets    []Facet `json:"facets,omitempty"`
+	Facets    []Facet `json:"facets,omitempty"` // Omit if empty
 }
 
 func CreateSession(dotenvPath string) (*http.Response, *BlueskyAuthResponse, string) {
@@ -160,6 +160,7 @@ func parseFacets(text string) []Facet {
 	var facets []Facet
 	mentions := parseMentions(text)
 	urls := parseURLs(text)
+	tags := parseTags(text) 
 
 	for _, m := range mentions {
 		did, err := resolveHandle(m["handle"])
@@ -204,6 +205,7 @@ func parseFacets(text string) []Facet {
 			fmt.Printf("Error converting end index to integer: %v\n", err)
 			continue // Skip this URL if end index conversion fails
 		}
+
 		facets = append(facets, Facet{
 			Index: FacetIndex{
 				ByteStart: start,
@@ -216,24 +218,48 @@ func parseFacets(text string) []Facet {
 		})
 	}
 
+	for _, t := range tags {
+		start, err := strconv.Atoi(t["start"])
+		if err != nil {
+			fmt.Printf("Error converting start index to integer: %v\n", err)
+			continue // Skip this tag if start index conversion fails
+		}
+
+		end, err := strconv.Atoi(t["end"])
+		if err != nil {
+			fmt.Printf("Error converting end index to integer: %v\n", err)
+			continue // Skip this tag if end index conversion fails
+		}
+
+		facets = append(facets, Facet{
+			Index: FacetIndex{
+				ByteStart: start,
+				ByteEnd:   end,
+			},
+			Features: []FacetFeature{{
+				Type: "app.bsky.richtext.facet#tag",
+				Tag:  t["tag"],
+			}},
+		})
+	}
+
 	return facets
 }
 
-// Modified parseMentions to return the handle and indices
 func parseMentions(text string) []map[string]string {
 	var spans []map[string]string
 	mentionRegex := regexp.MustCompile(`[$|\W](@([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)`)
 	textBytes := []byte(text)
 
 	for _, match := range mentionRegex.FindAllSubmatchIndex(textBytes, -1) {
-		if len(match) >= 6 { // Ensure we have enough submatches
-			start := match[2] + 1 // Adjust for the leading character
+		if len(match) >= 6 { 
+			start := match[2] + 1
 			end := match[3]
 			handle := string(textBytes[match[4]:match[5]]) // Extract the handle
 
 			spans = append(spans, map[string]string{
-				"start":  fmt.Sprintf("%d", start), 
-				"end":    fmt.Sprintf("%d", end),   
+				"start":  fmt.Sprintf("%d", start),
+				"end":    fmt.Sprintf("%d", end),
 				"handle": string(handle),
 			})
 		}
@@ -241,7 +267,6 @@ func parseMentions(text string) []map[string]string {
 	return spans
 }
 
-// Modified parseURLs to return the URL and indices
 func parseURLs(text string) []map[string]string {
 	var spans []map[string]string
 	urlRegex := regexp.MustCompile(`[$|\W](https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*[-a-zA-Z0-9@%_\+~#//=])?)`)
@@ -249,7 +274,7 @@ func parseURLs(text string) []map[string]string {
 
 	for _, match := range urlRegex.FindAllSubmatchIndex(textBytes, -1) {
 		if len(match) >= 4 {
-			start := match[2] + 1 
+			start := match[2] + 1
 			end := match[3]
 			urlStr := string(textBytes[match[2]:match[3]]) // Extract the URL
 
@@ -257,6 +282,27 @@ func parseURLs(text string) []map[string]string {
 				"start": fmt.Sprintf("%d", start),
 				"end":   fmt.Sprintf("%d", end),
 				"url":   urlStr,
+			})
+		}
+	}
+	return spans
+}
+
+func parseTags(text string) []map[string]string {
+	var spans []map[string]string
+	tagRegex := regexp.MustCompile(`#([a-zA-Z0-9_]+)`)
+	textBytes := []byte(text)
+
+	for _, match := range tagRegex.FindAllSubmatchIndex(textBytes, -1) {
+		if len(match) >= 4 {
+			start := match[2]
+			end := match[3]
+			tag := string(textBytes[match[2]:match[3]]) // Extract the tag
+
+			spans = append(spans, map[string]string{
+				"start": fmt.Sprintf("%d", start),
+				"end":   fmt.Sprintf("%d", end),
+				"tag":   tag,
 			})
 		}
 	}

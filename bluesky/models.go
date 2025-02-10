@@ -20,6 +20,7 @@ type FacetFeature struct {
 	Type string `json:"$type"`
 	Did  string `json:"did,omitempty"`
 	URI  string `json:"uri,omitempty"`
+    Tag  string `json:"tag,omitempty"`
 }
 
 type BlueskyAuth struct {
