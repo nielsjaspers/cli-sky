@@ -13,10 +13,17 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func CreateSession() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("Error loading .env file")
+func CreateSession(dotenvPath string) (*http.Response, string) {
+	if dotenvPath == "" {
+		err := godotenv.Load()
+		if err != nil {
+			log.Fatalf("Error loading .env file")
+		}
+	} else {
+		err := godotenv.Load(dotenvPath)
+		if err != nil {
+			log.Fatalf("Error loading .env file")
+		}
 	}
 
 	identifier := os.Getenv("BLUESKY_HANDLE")
@@ -30,41 +37,40 @@ func CreateSession() {
 
 	var postURL string = "https://bsky.social/xrpc/com.atproto.server.createSession"
 
-    body := BlueskyAuth{
-        Identifier: identifier,
-        Password: password,
-    }
-
-    bodyBytes, err := json.Marshal(&body)
-	if err != nil {
-        log.Fatalf("Error parsing body to bytes: %v", err)
+	body := BlueskyAuth{
+		Identifier: identifier,
+		Password:   password,
 	}
 
-    reader := bytes.NewReader(bodyBytes)
-
-    resp, err := http.Post(postURL, "application/json", reader)
+	bodyBytes, err := json.Marshal(&body)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error parsing body to bytes: %v", err)
 	}
 
-    defer func() {
+	reader := bytes.NewReader(bodyBytes)
+
+	resp, err := http.Post(postURL, "application/json", reader)
+	if err != nil {
+		log.Fatalf("Error while doing POST request: %v", err)
+	}
+
+	defer func() {
 		err := resp.Body.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Error closing response body: %v", err)
 		}
 	}()
 
-    // Read response body
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error reading response body: %v", err)
 	}
 
 	if resp.StatusCode >= 400 && resp.StatusCode <= 500 {
 		log.Println("Error response. Status Code: ", resp.StatusCode)
 	}
 
-	log.Println("Response:", string(responseBody))
+	return resp, string(responseBody)
 }
 
 func Post(post *BlueskyPost) {
