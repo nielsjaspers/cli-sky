@@ -1,2 +1,2 @@
 .env
-.env.test
+/test/bluesky/.env.test

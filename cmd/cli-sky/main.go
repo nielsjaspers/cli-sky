@@ -7,6 +7,10 @@ import (
 )
 
 func main(){
-    _, responseBody := bluesky.CreateSession("")
+    //// COMMENT THIS IF YOU DONT WANT TO HIT THE API
+    //// YOU'LL BE RATE LIMITED :(
+    _, authResponse, responseBody := bluesky.CreateSession("")
     fmt.Println(responseBody)
+
+    bluesky.Post("Just testing something out. Don't mind me :)", authResponse)
 }
