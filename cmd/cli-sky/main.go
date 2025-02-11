@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/nielsjaspers/cli-sky/bluesky"
+    "github.com/nielsjaspers/cli-sky/internal/datahandler"
 )
 
 func main(){
@@ -12,5 +13,11 @@ func main(){
     _, authResponse, responseBody := bluesky.CreateSession("")
     fmt.Println(responseBody)
 
-    bluesky.Post("this is a test from the terminal! i am making a cli tool for bluesky in go!\nhttps://github.com/nielsjaspers/cli-sky\n\n#computerscience #dev #programming #golang #bluesky #opensource", authResponse)
+    err := datahandler.WriteAuthResponseToFile(authResponse)
+    if err != nil {
+        panic(1)
+    }
+
+    // bluesky.Post("this is a test from the terminal! i am making a cli tool for bluesky in go!\nhttps://github.com/nielsjaspers/cli-sky\n\n#computerscience #buildinpublic #programming #golang #bluesky #opensource", authResponse)
+    // bluesky.Post("testing from the #terminal", authResponse)
 }
