@@ -6,6 +6,12 @@ type BlueskyPost struct {
 	CreatedAt string `json:"createdAt"`
 }
 
+type PostRecord struct {
+	Text      string  `json:"text"`
+	CreatedAt string  `json:"createdAt"`
+	Facets    []Facet `json:"facets,omitempty"`
+}
+
 type Facet struct {
 	Index    FacetIndex     `json:"index"`
 	Features []FacetFeature `json:"features"`

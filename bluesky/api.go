@@ -17,12 +17,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type PostRecord struct {
-	Text      string  `json:"text"`
-	CreatedAt string  `json:"createdAt"`
-	Facets    []Facet `json:"facets,omitempty"` // Omit if empty
-}
-
 func CreateSession(dotenvPath string) (*http.Response, *BlueskyAuthResponse, string) {
 	if dotenvPath == "" {
 		err := godotenv.Load()
@@ -98,6 +92,44 @@ func CreateSession(dotenvPath string) (*http.Response, *BlueskyAuthResponse, str
 	return resp, &authResponse, string(responseBody)
 }
 
+func RefreshSession(refreshJwt string) (*BlueskyAuthResponse, error) {
+    url := "https://bsky.social/xrpc/com.atproto.server.refreshSession"
+
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+refreshJwt)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("refresh session failed: %s, %s", resp.Status, string(body))
+	}
+
+	// Parse the JSON response
+	var refreshResponse BlueskyAuthResponse
+	err = json.Unmarshal(body, &refreshResponse)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling JSON: %w", err)
+	}
+
+	return &refreshResponse, nil
+}
+
 func Post(content string, authResponse *BlueskyAuthResponse) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	now = strings.Replace(now, "+00:00", "Z", 1)
@@ -160,7 +192,7 @@ func parseFacets(text string) []Facet {
 	var facets []Facet
 	mentions := parseMentions(text)
 	urls := parseURLs(text)
-	tags := parseTags(text) 
+	tags := parseTags(text)
 
 	for _, m := range mentions {
 		did, err := resolveHandle(m["handle"])
@@ -252,7 +284,7 @@ func parseMentions(text string) []map[string]string {
 	textBytes := []byte(text)
 
 	for _, match := range mentionRegex.FindAllSubmatchIndex(textBytes, -1) {
-		if len(match) >= 6 { 
+		if len(match) >= 6 {
 			start := match[2] + 1
 			end := match[3]
 			handle := string(textBytes[match[4]:match[5]]) // Extract the handle
@@ -340,4 +372,3 @@ func resolveHandle(handle string) (string, error) {
 
 	return did, nil
 }
-
