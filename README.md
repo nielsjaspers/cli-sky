@@ -12,13 +12,11 @@ Currently, `cli-sky` supports the following features:
         *   *Note: Post content is currently hardcoded and will be configurable in an upcoming release.*
     *   ✅  Hashtags (automatic linking)
     *   ✅  Links (automatic linking)
-    *   🚧  Mentions (@handles - work in progress)
+    *   ✅  Mentions (@handles)
 
 ## Roadmap
 The following features are planned for future releases:
 
-*   **Posting Enhancements:**
-    *   Add support for mentioning users via @handles
 *   **Command-Line Interface Improvements:**
     *   Allow passing post content directly as a command-line argument (e.g., `cli-sky post "Hello, Bluesky!"`)
     *   Interactive mode for composing posts

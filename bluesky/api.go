@@ -197,19 +197,19 @@ func parseFacets(text string) []Facet {
 	for _, m := range mentions {
 		did, err := resolveHandle(m["handle"])
 		if err != nil {
-			fmt.Printf("Error resolving handle %s: %v\n", m["handle"], err)
+			log.Printf("Error resolving handle %s: %v\n", m["handle"], err)
 			continue // Skip this mention if handle resolution fails
 		}
 
 		start, err := strconv.Atoi(m["start"])
 		if err != nil {
-			fmt.Printf("Error converting start index to integer: %v\n", err)
+			log.Printf("Error converting start index to integer: %v\n", err)
 			continue // Skip this mention if start index conversion fails
 		}
 
 		end, err := strconv.Atoi(m["end"])
 		if err != nil {
-			fmt.Printf("Error converting end index to integer: %v\n", err)
+			log.Printf("Error converting end index to integer: %v\n", err)
 			continue // Skip this mention if end index conversion fails
 		}
 
@@ -228,13 +228,13 @@ func parseFacets(text string) []Facet {
 	for _, u := range urls {
 		start, err := strconv.Atoi(u["start"])
 		if err != nil {
-			fmt.Printf("Error converting start index to integer: %v\n", err)
+			log.Printf("Error converting start index to integer: %v\n", err)
 			continue // Skip this URL if start index conversion fails
 		}
 
 		end, err := strconv.Atoi(u["end"])
 		if err != nil {
-			fmt.Printf("Error converting end index to integer: %v\n", err)
+			log.Printf("Error converting end index to integer: %v\n", err)
 			continue // Skip this URL if end index conversion fails
 		}
 
@@ -253,13 +253,13 @@ func parseFacets(text string) []Facet {
 	for _, t := range tags {
 		start, err := strconv.Atoi(t["start"])
 		if err != nil {
-			fmt.Printf("Error converting start index to integer: %v\n", err)
+			log.Printf("Error converting start index to integer: %v\n", err)
 			continue // Skip this tag if start index conversion fails
 		}
 
 		end, err := strconv.Atoi(t["end"])
 		if err != nil {
-			fmt.Printf("Error converting end index to integer: %v\n", err)
+			log.Printf("Error converting end index to integer: %v\n", err)
 			continue // Skip this tag if end index conversion fails
 		}
 
@@ -280,19 +280,26 @@ func parseFacets(text string) []Facet {
 
 func parseMentions(text string) []map[string]string {
 	var spans []map[string]string
-	mentionRegex := regexp.MustCompile(`[$|\W](@([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)`)
+	mentionRegex := regexp.MustCompile(`(?m)(?:^|\W)(@([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)`)
 	textBytes := []byte(text)
 
-	for _, match := range mentionRegex.FindAllSubmatchIndex(textBytes, -1) {
-		if len(match) >= 6 {
-			start := match[2] + 1
+	matches := mentionRegex.FindAllSubmatchIndex(textBytes, -1)
+
+	for _, match := range matches {
+		if len(match) >= 4 {
+			start := match[2]
 			end := match[3]
-			handle := string(textBytes[match[4]:match[5]]) // Extract the handle
+			handle := string(textBytes[match[2]:match[3]])
+
+			// Remove the leading "@" symbol from the handle
+			if len(handle) > 0 && handle[0] == '@' {
+				handle = handle[1:]
+			}
 
 			spans = append(spans, map[string]string{
-				"start":  fmt.Sprintf("%d", start),
-				"end":    fmt.Sprintf("%d", end),
-				"handle": string(handle),
+				"start":  strconv.Itoa(start),
+				"end":    strconv.Itoa(end),
+				"handle": handle,
 			})
 		}
 	}
