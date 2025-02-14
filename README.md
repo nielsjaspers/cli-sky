@@ -2,7 +2,8 @@
 
 A command-line tool for interacting with the Bluesky social network, written in Go.
 
->**Note:** This project is under active development and is not yet feature-complete.  Expect changes and potential issues.
+> [!NOTE]
+> This project is under active development and is not yet feature-complete.  Expect changes and potential issues.
 
 ## Features
 Currently, `cli-sky` supports the following features:
