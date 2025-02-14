@@ -93,7 +93,7 @@ func CreateSession(dotenvPath string) (*http.Response, *BlueskyAuthResponse, str
 }
 
 func RefreshSession(refreshJwt string) (*BlueskyAuthResponse, error) {
-    url := "https://bsky.social/xrpc/com.atproto.server.refreshSession"
+	url := "https://bsky.social/xrpc/com.atproto.server.refreshSession"
 
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
@@ -308,20 +308,35 @@ func parseMentions(text string) []map[string]string {
 
 func parseURLs(text string) []map[string]string {
 	var spans []map[string]string
-	urlRegex := regexp.MustCompile(`[$|\W](https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*[-a-zA-Z0-9@%_\+~#//=])?)`)
+	urlRegex := regexp.MustCompile(`(?m)(?:^|\W)((https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*)))`)
 	textBytes := []byte(text)
+	textLength := len(textBytes)
 
-	for _, match := range urlRegex.FindAllSubmatchIndex(textBytes, -1) {
+	matches := urlRegex.FindAllSubmatchIndex(textBytes, -1)
+
+	for _, match := range matches {
 		if len(match) >= 4 {
-			start := match[2] + 1
+			start := match[2]
 			end := match[3]
-			urlStr := string(textBytes[match[2]:match[3]]) // Extract the URL
 
-			spans = append(spans, map[string]string{
-				"start": fmt.Sprintf("%d", start),
-				"end":   fmt.Sprintf("%d", end),
-				"url":   urlStr,
-			})
+			if start >= 0 && end <= textLength && start < end {
+				urlStr := string(textBytes[start:end])
+
+				// Validate the URL
+				_, err := url.ParseRequestURI(urlStr)
+				if err != nil {
+					log.Printf("Invalid URL: %s, error: %v\n", urlStr, err)
+					continue // Skip invalid URLs
+				}
+
+				spans = append(spans, map[string]string{
+					"start": strconv.Itoa(start),
+					"end":   strconv.Itoa(end),
+					"url":   urlStr,
+				})
+			} else {
+				log.Printf("Invalid URL indices: start=%d, end=%d, textLength=%d\n", start, end, textLength)
+			}
 		}
 	}
 	return spans
@@ -329,20 +344,28 @@ func parseURLs(text string) []map[string]string {
 
 func parseTags(text string) []map[string]string {
 	var spans []map[string]string
-	tagRegex := regexp.MustCompile(`#([a-zA-Z0-9_]+)`)
+	tagRegex := regexp.MustCompile(`(?m)(#([a-zA-Z0-9_]+))`)
 	textBytes := []byte(text)
+	textLength := len(textBytes)
 
-	for _, match := range tagRegex.FindAllSubmatchIndex(textBytes, -1) {
+	matches := tagRegex.FindAllSubmatchIndex(textBytes, -1)
+
+	for _, match := range matches {
 		if len(match) >= 4 {
 			start := match[2]
 			end := match[3]
-			tag := string(textBytes[match[2]:match[3]]) // Extract the tag
 
-			spans = append(spans, map[string]string{
-				"start": fmt.Sprintf("%d", start),
-				"end":   fmt.Sprintf("%d", end),
-				"tag":   tag,
-			})
+			if start >= 0 && end <= textLength && start <= end {
+				tag := string(textBytes[start:end])
+
+				spans = append(spans, map[string]string{
+					"start": strconv.Itoa(start),
+					"end":   strconv.Itoa(end),
+					"tag":   tag,
+				})
+			} else {
+				log.Printf("Invalid tag indices: start=%d, end=%d, textLength=%d\n", start, end, textLength)
+			}
 		}
 	}
 	return spans
@@ -379,3 +402,4 @@ func resolveHandle(handle string) (string, error) {
 
 	return did, nil
 }
+
