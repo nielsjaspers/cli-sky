@@ -1,9 +1,11 @@
 package main
 
 import (
-	//"fmt"
+
+	"fmt"
 
 	"github.com/nielsjaspers/cli-sky/bluesky"
+	"github.com/nielsjaspers/cli-sky/cmd"
 	"github.com/nielsjaspers/cli-sky/internal/datahandler"
 )
 
@@ -24,18 +26,19 @@ func main(){
     if err != nil {
         panic(1)
     }
-    
-    // resp, err := bluesky.RefreshSession(authData.RefreshJwt)
-    // if err != nil {
-    //     panic(1)
-    // }
-    // fmt.Printf("AccessJwt: %v", resp.AccessJwt)
-    // fmt.Printf("RefreshJwt: %v", resp.RefreshJwt)
-    //
-    // err = datahandler.WriteAuthResponseToFile(resp)
-    // if err != nil {
-    //     panic(1)
-    // }
 
-    bluesky.Post("Hello bluesky, this is a test!", authData)
+    resp, err := bluesky.RefreshSession(authData.RefreshJwt)
+    if err != nil {
+        panic(1)
+    }
+    fmt.Printf("AccessJwt: %v", authData.AccessJwt)
+    fmt.Printf("RefreshJwt: %v", authData.RefreshJwt)
+
+    err = datahandler.WriteAuthResponseToFile(resp)
+    if err != nil {
+        panic(1)
+    }
+
+    // bluesky.Post("another hello from the terminal! got links working correctly, so here is a shameless plug to my project :)\nhttps://github.com/nielsjaspers/cli-sky \n\n#opensource #bluesky #buildinpublic #golang", authData)
+    cmd.Execute()
 }
