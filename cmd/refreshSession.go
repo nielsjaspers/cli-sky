@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var refreshCmd = &cobra.Command{
+var refreshSessionCmd = &cobra.Command{
 	Use:   "refresh \"@handle.bsky.com\"",
 	Short: "Refresh a session",
 	Long:  "Allows you to refresh a session.",
@@ -32,6 +32,6 @@ var refreshCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(refreshCmd)
+	rootCmd.AddCommand(refreshSessionCmd)
 }
 
