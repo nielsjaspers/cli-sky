@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 
 	"github.com/nielsjaspers/cli-sky/bluesky"
@@ -20,17 +21,24 @@ var postCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		message := args[0]
 
+		// Unescape the string to interpret \n as newlines
+		message, err := strconv.Unquote(`"` + message + `"`)
+		if err != nil {
+			log.Fatalf("Error unescaping message: %v", err)
+			return
+		}
+
 		// Clean the handle (remove "@" if present)
 		cleanedHandle := strings.TrimPrefix(handlePost, "@")
 
-        authData, err := datahandler.ReadAuthResponseFromFile(cleanedHandle)
-        if err != nil {
-            log.Fatalf("Error reading Auth data: %v", err)
-        }
+		authData, err := datahandler.ReadAuthResponseFromFile(cleanedHandle)
+		if err != nil {
+			log.Fatalf("Error reading Auth data: %v", err)
+		}
 
 		fmt.Printf("Posting message: %s\n", message)
 		fmt.Printf("Using handle: %s\n", cleanedHandle)
-        bluesky.Post(message, authData)
+		bluesky.Post(message, authData)
 	},
 }
 
